@@ -1,0 +1,17 @@
+{
+  "name": "moonraker",
+  "version": "0.0.0-ignored",
+  "Gruntfile": "Gruntfile.js",
+  "devDependencies": {
+    "grunt":                "~0.4.1",
+    "path":                 "~0.4.9",
+    "grunt-contrib-jshint": "*",
+    "grunt-contrib-concat": "*",
+    "grunt-contrib-uglify": "*",
+    "grunt-contrib-watch":  "*",
+    "grunt-contrib-copy":   "*",
+    "grunt-contrib-clean":  "*",
+    "grunt-htmlhint":       "*",
+    "matchdep":             "*"
+  }
+}
