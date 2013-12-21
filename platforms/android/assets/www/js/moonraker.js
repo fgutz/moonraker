@@ -3872,9 +3872,161 @@ var swfobject=function(){var D="undefined",r="object",S="Shockwave Flash",W="Sho
 
 })();
 
+var Skyfall = {
+  _servers: {},
+  _settings: {
+    animate: true,
+    warningLevel: 40
+  },
+
+  getServer: function(serverName){
+    if(this._servers[serverName]) {
+      return this._servers[serverName];
+    }
+    return null;
+  },
+
+  addServer: function(serverName, ip, port, start){
+    if(!port) { port = 3007; }
+    if(!start) { start = true; }
+    
+    var socket = io.connect('http://' + ip + ':' + port, {
+      'reconnect': true,
+      'reconnection delay': 500,
+      'max reconnection attempts': 5
+    });
+
+    var server = this._servers[serverName] = {
+      name: serverName,
+      ip: ip,
+      port: port,
+      socket: socket,
+      cpuTimes: {},
+      settings: {}
+    };
+    
+    // sysInfo
+    socket.on('sysInfo', $.proxy(this.sysInfo, server));
+    // loadInfo
+    socket.on('loadInfo', $.proxy(this.loadInfo, server));
+    // diskspace
+    socket.on('diskspace', $.proxy(this.diskspace, server));
+    
+    this.addListeners(server);
+    if(start) { this.startServer(serverName); }
+  },
+
+  sysInfo: function(data) {
+    Skyfall.log(data);
+
+  },
+  loadInfo: function(data) {
+    Skyfall.log(data);
+  },
+  
+  addListeners: function(server){
+    var socket = server.socket;
+    // connecting
+    socket.on('connecting', $.proxy(function(){
+      Skyfall.log('connecting...');
+    }, server));
+    // connect
+    socket.on('connect', $.proxy(function(){
+      Skyfall.log('connected');
+    }, server));
+    // connect_failed
+    socket.on('connect_failed', $.proxy(function(){
+      Skyfall.log('Failed to connect to ' + this.name);
+    }, server));
+    // disconnect
+    socket.on('disconnect', $.proxy(function(){
+      Skyfall.log('disconnected from ' + this.name);
+    }, server));
+    // reconnecting
+    socket.on('reconnecting', $.proxy(function(){
+      Skyfall.log('reconnecting...');
+    }, server));
+    // reconnect
+    socket.on('reconnect', $.proxy(function(transport_type, reconnectionAttempts){
+      Skyfall.log('reconnected to ' + this.name);
+      Skyfall.startServer(this.name, server.settings);
+    }, server));
+    // reconnect_failed
+    socket.on('reconnect_failed', $.proxy(function(){
+      Skyfall.log('Failed to reconnect to ' + this.name);
+    }, server));
+    // error
+    socket.on('error', $.proxy(function(msg){
+      Skyfall.log('error: '+msg);
+    }, server));
+    // message
+    socket.on('message', $.proxy(function(msg, callback){
+      Skyfall.log(msg);
+    }, server));
+  },
+  
+  diskspace: function(data){
+    var used = data.total - data.free;
+    var pct = data.total > 0 ? Math.round((used / data.total) * 100) : 0;
+    return pct;
+  },
+  
+  startServer: function(serverName, opts){
+    if(!opts) { opts = {}; }
+    var server = Skyfall.getServer(serverName);
+    server.socket.emit('start', opts);
+  },
+  
+  stopServer: function(serverName){
+    var server = Skyfall.getServer(serverName);
+    server.socket.emit('stop', {});
+  },
+  
+  removeServer: function(serverName){
+    var server = Skyfall.getServer(serverName);
+    server.socket.emit('stop', {});
+    server.socket.disconnect();
+    delete this._servers[serverName];
+  },
+  
+  startAll: function(){
+    for(var i=0; i<this._servers.length; i++){
+      var server = this._servers[i];
+      this.startServer(server.name, server.settings);
+    }
+  },
+  
+  stopAll: function(){
+    for(var i=0; i<this._servers.length; i++){
+      this.stopServer(this._servers[i].name);
+    }
+  },
+  
+  log: function(msg){
+    if(console) {
+      console.log(msg);
+    } else {
+      $('#log').text(msg);
+    }
+  },
+  
+  _convertTime: function(ts){
+    var totalSec = ts,
+      days = parseInt(totalSec / 86400),
+      hours = parseInt(totalSec / 3600) % 24,
+      minutes = parseInt(totalSec / 60) % 60,
+      seconds = parseInt(totalSec % 60);
+
+    var result = (days > 0 ? days + ' days ' : '') + (hours < 10 ? "0" + hours : hours) + "hrs " + (minutes < 10 ? "0" + minutes : minutes) + "min " + (seconds  < 10 ? "0" + seconds : seconds) + 'sec';
+    return result;
+  }
+};
+
 var PageTransitions = (function() {
     
     var isAnimating = false,
+        outClass = "",
+        inClass = "",
         animEndEventNames = {
             'WebkitAnimation' : 'webkitAnimationEnd',
             'OAnimation' : 'oAnimationEnd',
@@ -3926,80 +4078,65 @@ var PageTransitions = (function() {
 
 var trans = new PageTransitions();
 
-var confg;
+var config;
+
+function testApp(servers) {
+  for (var name in servers) {
+    var address,
+        server = servers[name],
+        port = 3007;
+
+    if (typeof server === 'object') {
+        address = server['address'];
+        if (server['port']) { port = server['port']; }
+    } else {
+        var split = server.split(':');
+        address = split[0];
+        if (split.length > 1) { port = split[1]; }
+    }
+    Skyfall.addServer(name, address, port);
+  }
+}
 
 $.getJSON("js/config.json", function(json) {
-    config = json;
-    console.log(config);
+  config = json;
+  trans.go($('.pt-page-1'),$('.pt-page-2'),"up");
+  testApp(config.servers);
 });
 
-var Socket = {
-    init: function(){
-        var socket = io.connect(config.monitor);
-
-        document.getElementById('log').innerHTML = "connecting";
-
-        socket.on('ping', function (data) {
-            document.getElementById('log').innerHTML = data.message;
-            socket.emit('pong', { message: 'Hello from client!' });
-        });
-
-        socket.on('connect', function () {
-            document.getElementById('log').innerHTML = "connected";
-        });
-
-        socket.on('reconnect', function () {
-            document.getElementById('log').innerHTML = "reconnected";
-        });
-
-        socket.on('disconnect', function () {
-            document.getElementById('log').innerHTML = "disconnected";
-        });
-
-        socket.on('reconnecting', function () {
-            document.getElementById('log').innerHTML = "reconnecting...";
-        });
-
-        socket.on('error', function () {
-            document.getElementById('log').innerHTML = "error";
-        });
-    }
-};
-
 var app = {
-    // Application Constructor
-    initialize: function() {
-        this.bindEvents();
-    },
-    // Bind Event Listeners
-    //
-    // Bind any events that are required on startup. Common events are:
-    // 'load', 'deviceready', 'offline', and 'online'.
-    bindEvents: function() {
-        document.addEventListener('deviceready', this.onDeviceReady, false);
-    },
-    // deviceready Event Handler
-    //
-    // The scope of 'this' is the event. In order to call the 'receivedEvent'
-    // function, we must explicity call 'app.receivedEvent(...);'
-    onDeviceReady: function() {
-        app.receivedEvent('deviceready');
-    },
-    // Update DOM on a Received Event
-    receivedEvent: function(id) {
-        var parentElement = document.getElementById(id);
-        var listeningElement = parentElement.querySelector('.listening');
-        var receivedElement = parentElement.querySelector('.received');
+  // Application Constructor
+  initialize: function() {
+    this.bindEvents();
+  },
+  // Bind Event Listeners
+  //
+  // Bind any events that are required on startup. Common events are:
+  // 'load', 'deviceready', 'offline', and 'online'.
+  bindEvents: function() {
+    document.addEventListener('deviceready', this.onDeviceReady, false);
+  },
+  // deviceready Event Handler
+  //
+  // The scope of 'this' is the event. In order to call the 'receivedEvent'
+  // function, we must explicity call 'app.receivedEvent(...);'
+  onDeviceReady: function() {
+    app.receivedEvent('deviceready');
+  },
+  // Update DOM on a Received Event
+  receivedEvent: function(id) {
+    var parentElement = document.getElementById(id);
+    var listeningElement = parentElement.querySelector('.listening');
+    var receivedElement = parentElement.querySelector('.received');
 
-        listeningElement.setAttribute('style', 'display:none;');
-        receivedElement.setAttribute('style', 'display:block;');
+    listeningElement.setAttribute('style', 'display:none;');
+    receivedElement.setAttribute('style', 'display:block;');
 
-        console.log('Received Event: ' + id);
-        
-        var exitSplash = setTimeout(function(){
-            trans.go($('.pt-page-1'),$('.pt-page-2'),"up");
-            Socket.init();
-            //document.addEventListener("deviceready", init, false);
-        },3000);
-    }
+    console.log('Received Event: ' + id);
+
+    var exitSplash = setTimeout(function(){
+      //trans.go($('.pt-page-1'),$('.pt-page-2'),"up");
+    },3000);
+  }
 };
+

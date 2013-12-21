@@ -2,6 +2,8 @@
 var PageTransitions = (function() {
     
     var isAnimating = false,
+        outClass = "",
+        inClass = "",
         animEndEventNames = {
             'WebkitAnimation' : 'webkitAnimationEnd',
             'OAnimation' : 'oAnimationEnd',

@@ -37,6 +37,7 @@
 /Users/francisco/personal/android_workspace/moonraker/platforms/android/assets/www/js/libs \
 /Users/francisco/personal/android_workspace/moonraker/platforms/android/assets/www/js/moonraker.js \
 /Users/francisco/personal/android_workspace/moonraker/platforms/android/assets/www/js/moonraker.min.js \
+/Users/francisco/personal/android_workspace/moonraker/platforms/android/assets/www/js/skyfall.js \
 /Users/francisco/personal/android_workspace/moonraker/platforms/android/assets/www/js/transitions.js \
 /Users/francisco/personal/android_workspace/moonraker/platforms/android/assets/www/js/libs/jquery-2.0.3.min.js \
 /Users/francisco/personal/android_workspace/moonraker/platforms/android/assets/www/js/libs/modernizr.js \
